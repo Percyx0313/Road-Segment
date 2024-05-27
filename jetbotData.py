@@ -12,7 +12,7 @@ flip_rate = 0.4
 data_dirs = {
     "labelme": {
         "img_dir": "./data/labelme/data_dataset_voc/JPEGImages",
-        "seg_img_dir": "./data/labelme/data_dataset_voc/SegmentationClassNpy"
+        "seg_img_dir": "./data/labelme/data_dataset_voc/SegmentationClass"
     },
     "roadlane": {
         "img_dir": "./data/roadlane"
@@ -49,35 +49,64 @@ class LabelmeDataset(Dataset):
         self.new_w = new_w
         self.split = split
         self.n_class = num_class
+        self.label_colors = {
+            0: [0,0,0],   # black -> background
+            1: [128,0,0],   # dark red -> road
+            2: [0,128,0],   # light green -> obstacle
+            3: [128,128,0]  # green -> destination
+        }
 
     def __len__(self):
         return len(self.X)
 
+    def rgb_to_label_image(self, rgb_image):
+        # Create an empty label image with the same height and width as the input image
+        height, width, _ = rgb_image.shape
+        label_image = np.zeros((height, width), dtype=np.int32)
+        
+        # Loop through each color and assign the corresponding label
+        for label, color in self.label_colors.items():
+            # Create a mask for the current color
+            mask = np.all(rgb_image == color, axis=-1)
+            # Assign the label to the mask
+            label_image[mask] = label
+    
+        return label_image
+    
     def __getitem__(self, idx):
         # open image data
         img = Image.open(self.X[idx]).convert('RGB')
+        if self.split == "train":
+            img = img.resize((2*self.new_w, 2*self.new_h), resample=Image.Resampling.NEAREST)
+        else:
+            img = img.resize((self.new_w, self.new_h), resample=Image.Resampling.NEAREST)
         w, h = img.size
         img = np.asarray(img)
 
-        # open segement image .npy data 
-        seg_img = np.load(self.Y[idx])
+        # open segement image data 
+        seg_rgb_img = Image.open(self.Y[idx]).convert('RGB')
+        if self.split == "train":
+            seg_rgb_img = seg_rgb_img.resize((2*self.new_w, 2*self.new_h), resample=Image.Resampling.NEAREST)
+        else:
+            seg_rgb_img = seg_rgb_img.resize((self.new_w, self.new_h), resample=Image.Resampling.NEAREST)
+        seg_rgb_img = np.asarray(seg_rgb_img)
+        seg_img = self.rgb_to_label_image(seg_rgb_img)
 
         # crop image and seg_img
         if self.split == "train":
             A_x_offset = np.int32(np.random.randint(0, w - self.new_w + 1, 1))[0]
             A_y_offset = np.int32(np.random.randint(0, h - self.new_h + 1, 1))[0]
-        else:
-            A_x_offset = int((w - self.new_w)/2)
-            A_y_offset = int((h - self.new_h)/2)
-            
-        img = img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w] 
-        seg_img = seg_img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w]
+            img = img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w] 
+            seg_rgb_img = seg_rgb_img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w]
+            seg_img = seg_img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w]
 
         # flip images and seg_img 
-        img = np.transpose(img, (2, 0, 1)) / 255.
         if np.random.sample() < flip_rate and self.split == "train":
             img = np.fliplr(img)
+            seg_rgb_img = np.fliplr(seg_rgb_img)
             seg_img = np.fliplr(seg_img)
+        img = np.transpose(img, (2, 0, 1)) / 255.
+        seg_rgb_img = np.transpose(seg_rgb_img, (2, 0, 1)) / 255.
 
         # create tensor
         img = torch.from_numpy(img.copy()).float()
@@ -89,7 +118,7 @@ class LabelmeDataset(Dataset):
         for c in range(self.n_class):
             target[c][seg_img == c] = 1
 
-        return {"img": img, "label": target}
+        return {"img": img, "label": target, "seg_rgb": seg_rgb_img}
     
 
 class RoadLaneDataset(Dataset):
@@ -131,30 +160,22 @@ class RoadLaneDataset(Dataset):
     def __getitem__(self, idx):
         # open image data
         img = Image.open(self.X[idx]).convert('RGB')
-        w, h = img.size
+        img = img.resize((self.new_w, self.new_h), resample=Image.Resampling.NEAREST)
         img = np.asarray(img)
 
         # open segement image data 
-        img = Image.open(self.X[idx]).convert('RGB')
-        img = np.asarray(img)
-        seg_img = self.rgb_to_label_image(img)
-
-        # crop image and seg_img
-        if self.split == "train":
-            A_x_offset = np.int32(np.random.randint(0, w - self.new_w + 1, 1))[0]
-            A_y_offset = np.int32(np.random.randint(0, h - self.new_h + 1, 1))[0]
-        else:
-            A_x_offset = int((w - self.new_w)/2)
-            A_y_offset = int((h - self.new_h)/2)
-            
-        img = img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w] 
-        seg_img = seg_img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w]
+        seg_rgb_img = Image.open(self.Y[idx]).convert('RGB')
+        seg_rgb_img = seg_rgb_img.resize((self.new_w, self.new_h), resample=Image.Resampling.NEAREST)
+        seg_rgb_img = np.asarray(seg_rgb_img)
+        seg_img = self.rgb_to_label_image(seg_rgb_img)
 
         # flip images and seg_img 
-        img = np.transpose(img, (2, 0, 1)) / 255.
         if np.random.sample() < flip_rate and self.split == "train":
             img = np.fliplr(img)
+            seg_rgb_img = np.fliplr(seg_rgb_img)
             seg_img = np.fliplr(seg_img)
+        img = np.transpose(img, (2, 0, 1)) / 255.
+        seg_rgb_img = np.transpose(seg_rgb_img, (2, 0, 1)) / 255.
 
         # create tensor
         img = torch.from_numpy(img.copy()).float()
@@ -166,7 +187,7 @@ class RoadLaneDataset(Dataset):
         for c in range(self.n_class):
             target[c][seg_img == c] = 1
 
-        return {"img": img, "label": target}
+        return {"img": img, "label": target, "seg_rgb": seg_rgb_img}
     
 def read_labels(labels_file=labels_file):
     label_map = {}
