@@ -7,7 +7,7 @@ from torchvision import transforms as T
 from sklearn.model_selection import train_test_split
 
 num_class = 4 # Road / Box shaped obstacle / Destination point / Background (Others) 
-new_h, new_w = 224, 220 # cropped image size
+new_h, new_w = 224, 224 # cropped image size
 flip_rate = 0.4
 data_dirs = {
     "labelme": {
