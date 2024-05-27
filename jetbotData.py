@@ -7,7 +7,7 @@ from torchvision import transforms as T
 from sklearn.model_selection import train_test_split
 
 num_class = 4 # Road / Box shaped obstacle / Destination point / Background (Others) 
-new_h, new_w = 224, 224 # cropped image size
+new_h, new_w = 224, 220 # cropped image size
 flip_rate = 0.4
 data_dirs = {
     "labelme": {
@@ -56,6 +56,7 @@ class LabelmeDataset(Dataset):
     def __getitem__(self, idx):
         # open image data
         img = Image.open(self.X[idx]).convert('RGB')
+        # img = img.resize((self.new_w, self.new_h))
         w, h = img.size
         img = np.asarray(img)
 
@@ -74,10 +75,10 @@ class LabelmeDataset(Dataset):
         seg_img = seg_img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w]
 
         # flip images and seg_img 
-        img = np.transpose(img, (2, 0, 1)) / 255.
         if np.random.sample() < flip_rate and self.split == "train":
             img = np.fliplr(img)
             seg_img = np.fliplr(seg_img)
+        img = np.transpose(img, (2, 0, 1)) / 255.
 
         # create tensor
         img = torch.from_numpy(img.copy()).float()
@@ -131,30 +132,22 @@ class RoadLaneDataset(Dataset):
     def __getitem__(self, idx):
         # open image data
         img = Image.open(self.X[idx]).convert('RGB')
-        w, h = img.size
+        img = img.resize((self.new_w, self.new_h))
         img = np.asarray(img)
 
         # open segement image data 
-        img = Image.open(self.X[idx]).convert('RGB')
-        img = np.asarray(img)
-        seg_img = self.rgb_to_label_image(img)
-
-        # crop image and seg_img
-        if self.split == "train":
-            A_x_offset = np.int32(np.random.randint(0, w - self.new_w + 1, 1))[0]
-            A_y_offset = np.int32(np.random.randint(0, h - self.new_h + 1, 1))[0]
-        else:
-            A_x_offset = int((w - self.new_w)/2)
-            A_y_offset = int((h - self.new_h)/2)
-            
-        img = img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w] 
-        seg_img = seg_img[A_y_offset: A_y_offset + self.new_h, A_x_offset: A_x_offset + self.new_w]
+        seg_rgb_img = Image.open(self.Y[idx]).convert('RGB')
+        seg_rgb_img = seg_rgb_img.resize((self.new_w, self.new_h))
+        seg_rgb_img = np.asarray(seg_rgb_img)
+        seg_img = self.rgb_to_label_image(seg_rgb_img)
 
         # flip images and seg_img 
-        img = np.transpose(img, (2, 0, 1)) / 255.
         if np.random.sample() < flip_rate and self.split == "train":
             img = np.fliplr(img)
+            seg_rgb_img = np.fliplr(seg_rgb_img)
             seg_img = np.fliplr(seg_img)
+        img = np.transpose(img, (2, 0, 1)) / 255.
+        seg_rgb_img = np.transpose(seg_rgb_img, (2, 0, 1)) / 255.
 
         # create tensor
         img = torch.from_numpy(img.copy()).float()
@@ -166,7 +159,7 @@ class RoadLaneDataset(Dataset):
         for c in range(self.n_class):
             target[c][seg_img == c] = 1
 
-        return {"img": img, "label": target}
+        return {"img": img, "label": target, "seg_rgb": seg_rgb_img}
     
 def read_labels(labels_file=labels_file):
     label_map = {}
