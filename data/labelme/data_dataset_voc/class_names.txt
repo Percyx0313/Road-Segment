@@ -1,3 +1,4 @@
 _background_
 road
 obstacle
+destination
