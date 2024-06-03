@@ -7,12 +7,12 @@ from torchvision import transforms as T
 from sklearn.model_selection import train_test_split
 
 num_class = 4 # Road / Box shaped obstacle / Destination point / Background (Others) 
-new_h, new_w = 224, 224 # cropped image size
+new_h, new_w = 128, 128 # cropped image size
 flip_rate = 0.4
 data_dirs = {
     "labelme": {
-        "img_dir": "./data/labelme/data_dataset_voc/JPEGImages",
-        "seg_img_dir": "./data/labelme/data_dataset_voc/SegmentationClass"
+        "img_dir": "./data/labelme/fine_tune/images",
+        "seg_img_dir": "./data/labelme/fine_tune/masks"
     },
     "roadlane": {
         "img_dir": "./data/roadlane"
@@ -25,7 +25,7 @@ def create_train_val_set(data_dir, type="roadlane"):
         X = list(sorted([os.path.join(data_dir["img_dir"], file) for file in os.listdir(data_dir["img_dir"])]))
         y = list(sorted([os.path.join(data_dir["seg_img_dir"], file) for file in os.listdir(data_dir["seg_img_dir"])]))
 
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.3, shuffle=True)  
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, shuffle=True)  
     elif type == "roadlane":
         train_image_dir = os.path.join(data_dir["img_dir"], "train", "images")
         train_seg_image_dir = os.path.join(data_dir["img_dir"], "train", "masks")

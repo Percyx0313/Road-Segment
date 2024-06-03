@@ -1,5 +1,9 @@
-# Road-Segment
+# Road-Segmentation
+Road segmentation using
 Jetbot's Road segmentation model
+
+We using mobilenet-v3 to train the ROAD LANE Dataset first.
+After training , we finetune on the real jetbot Dataset Label by labelme.
 
 # Dataset
 ## Roadlane Dataset
@@ -11,15 +15,18 @@ https://www.kaggle.com/datasets/sovitrath/road-lane-segmentation-train-test-spli
 ```
 data
 |---roadlane
-    |---train
-    |   |---images
-    |   |---masks
-    |---val
+|   |---train
+|   |   |---images
+|   |   |---masks
+|   |---val
+|       |---images
+|       |---masks
+|---label
+    |---fine_tune
         |---images
         |---masks
 ```
 
-## LabelMe dataset
 
 ### Directory structure
 ```
@@ -37,14 +44,7 @@ data
     |   |---class_names.txt
     |---labels.txt
 ```
-### Label all images in data_annotated directory
-```
-cd data/labelme
-labelme data_annotated --labels labels.txt --nodata --validatelabel exact
-```
 
-### Create data_dataset_voc directory
-```
-cd data/labelme
-python labelme2voc.py data_annotated data_dataset_voc --labels labels.txt --noobject
-```
+### Result
+<img src="assets/real.jpg" width="400" height="300">
+<img src="assets/segment.jpg" width="400" height="300">
